@@ -8,6 +8,7 @@ import hydra
 from omegaconf import DictConfig
 
 
+# 从 37 类别到 12 类别的映射
 seg_class_map = [
     0,
     1,
@@ -50,15 +51,19 @@ seg_class_map = [
 
 
 def _rle2voxel(rle, voxel_size=(240, 144, 240), rle_filename=""):
-    r"""Read voxel label data from file (RLE compression), and convert it to fully occupancy labeled voxels.
-    code taken from https://github.com/waterljwant/SSC/blob/master/dataloaders/dataloader.py#L172
-    In the data loader of pytorch, only single thread is allowed.
-    For multi-threads version and more details, see 'readRLE.py'.
-    output: seg_label: 3D numpy array, size 240 x 144 x 240
+    r"""从文件读取体素标签数据 (RLE 压缩), 然后将它转换为具有完整 occupancy 标签的体素.
+    
+    代码取自 https://github.com/waterljwant/SSC/blob/master/dataloaders/dataloader.py#L172
+    
+    在 Pytorch 的 data loader 中, 只允许单线程. 对于多线程版本和更多细节, 查看 'readRLE.py'.
+    
+    Returns:
+        seg_label (numpy array): size 240 x 144 x 240
     """
+    
     seg_label = np.zeros(
         int(voxel_size[0] * voxel_size[1] * voxel_size[2]), dtype=np.uint8
-    )  # segmentation label
+    )  # 分割标签
     vox_idx = 0
     for idx in range(int(rle.shape[0] / 2)):
         check_val = rle[idx * 2]
@@ -72,28 +77,29 @@ def _rle2voxel(rle, voxel_size=(240, 144, 240), rle_filename=""):
             seg_label_val, 1, check_iter
         )
         vox_idx = vox_idx + check_iter
-    seg_label = seg_label.reshape(voxel_size)  # 3D array, size 240 x 144 x 240
+    # 分割标签 3D array, size 240 x 144 x 240
+    seg_label = seg_label.reshape(voxel_size)
     return seg_label
 
 
 def _read_rle(rle_filename):  # 0.0005s
-    """Read RLE compression data
-    code taken from https://github.com/waterljwant/SSC/blob/master/dataloaders/dataloader.py#L153
+    """读取 RLE 压缩数据
+    代码取自 https://github.com/waterljwant/SSC/blob/master/dataloaders/dataloader.py#L153
     Return:
-        vox_origin,
-        cam_pose,
-        vox_rle, voxel label data from file
+        vox_origin: 体素原点的世界坐标系
+        cam_pose: 相对于世界坐标系的相机位姿
+        vox_rle: 来自于文件的体素标签数据
     Shape:
         vox_rle, (240, 144, 240)
     """
     fid = open(rle_filename, "rb")
     vox_origin = np.fromfile(
         fid, np.float32, 3
-    ).T  # Read voxel origin in world coordinates
-    cam_pose = np.fromfile(fid, np.float32, 16).reshape((4, 4))  # Read camera pose
+    ).T  # 读取体素原点世界坐标系
+    cam_pose = np.fromfile(fid, np.float32, 16).reshape((4, 4))  # 读取相对于世界坐标系的相机位姿
     vox_rle = (
         np.fromfile(fid, np.uint32).reshape((-1, 1)).T
-    )  # Read voxel label data from file
+    )  # 从文件中读取体素标签数据
     vox_rle = np.squeeze(vox_rle)  # 2d array: (1 x N), to 1d array: (N , )
     fid.close()
     return vox_origin, cam_pose, vox_rle
