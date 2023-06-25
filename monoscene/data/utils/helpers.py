@@ -54,64 +54,64 @@ def vox2pix(cam_E, cam_k,
             vox_origin, voxel_size, 
             img_W, img_H, 
             scene_size):
-    """
-    compute the 2D projection of voxels centroids
+    """计算体素中心到 2D 的投影
     
-    Parameters:
-    ----------
-    cam_E: 4x4
-       =camera pose in case of NYUv2 dataset
-       =Transformation from camera to lidar coordinate in case of SemKITTI
-    cam_k: 3x3
-        camera intrinsics
-    vox_origin: (3,)
-        world(NYU)/lidar(SemKITTI) cooridnates of the voxel at index (0, 0, 0)
-    img_W: int
-        image width
-    img_H: int
-        image height
-    scene_size: (3,)
-        scene size in meter: (51.2, 51.2, 6.4) for SemKITTI and (4.8, 4.8, 2.88) for NYUv2
+    Args:
+        cam_E: 4x4
+           = NYUv2 数据集中的相机位姿
+           = SemKITTI 数据集中从相机坐标系到激光雷达坐标系的变换 (相机相对于激光雷达的位姿) 
+        cam_k: 3x3
+            相机内参
+        vox_origin: (3,)
+            索引为 (0, 0, 0) 的体素的世界(NYU) / 激光雷达(SemKITTI) 坐标
+        img_W: int
+            图像宽度
+        img_H: int
+            图像高度
+        scene_size: (3,)
+            场景尺寸 (米) 
+            = SemKITTI 为 (51.2, 51.2, 6.4)
+            = NYUv2 为 (4.8, 4.8, 2.88)
     
-    Returns
-    -------
-    projected_pix: (N, 2)
-        Projected 2D positions of voxels
-    fov_mask: (N,)
-        Voxels mask indice voxels inside image's FOV 
-    pix_z: (N,)
-        Voxels'distance to the sensor in meter
+    Returns:
+        projected_pix: (N, 2)
+            体素投影到 2D 的位置
+        fov_mask: (N,)
+            体素的模板, 指引了在图像的 FOV 之内的体素 
+        pix_z: (N,)
+            体素到传感器的距离 (米)
     """
-    # Compute the x, y, z bounding of the scene in meter
+    # 计算场景的 x, y, z 边界 (米)
     vol_bnds = np.zeros((3,2))
-    vol_bnds[:,0] = vox_origin
-    vol_bnds[:,1] = vox_origin + np.array(scene_size)
+    vol_bnds[:,0] = vox_origin  # 场景边界 min 为体素原点所在的世界坐标
+    vol_bnds[:,1] = vox_origin + np.array(scene_size)  # 场景边界 max 为原点世界坐标 + 场景尺寸
 
-    # Compute the voxels centroids in lidar cooridnates
-    vol_dim = np.ceil((vol_bnds[:,1]- vol_bnds[:,0])/ voxel_size).copy(order='C').astype(int)
+    # 计算激光雷达坐标系下的体素中心
+    vol_dim = np.ceil((vol_bnds[:,1] - vol_bnds[:,0])/ voxel_size).copy(order='C').astype(int)  # 各维度格子数量
     xv, yv, zv = np.meshgrid(
             range(vol_dim[0]),
             range(vol_dim[1]),
             range(vol_dim[2]),
             indexing='ij'
           )
+    # 得到每一个体素的索引
     vox_coords = np.concatenate([
             xv.reshape(1,-1),
             yv.reshape(1,-1),
             zv.reshape(1,-1)
           ], axis=0).astype(int).T
 
-    # Project voxels'centroid from lidar coordinates to camera coordinates
+    # 将体素中心从激光雷达坐标系投影到相机坐标系
     cam_pts = fusion.TSDFVolume.vox2world(vox_origin, vox_coords, voxel_size)
     cam_pts = fusion.rigid_transform(cam_pts, cam_E)
 
-    # Project camera coordinates to pixel positions
+    # 从相机坐标系投影到像素位置
     projected_pix = fusion.TSDFVolume.cam2pix(cam_pts, cam_k)
     pix_x, pix_y = projected_pix[:, 0], projected_pix[:, 1]
 
-    # Eliminate pixels outside view frustum
-    pix_z = cam_pts[:, 2]
-    fov_mask = np.logical_and(pix_x >= 0,
+    # 消除在视锥之外的像素
+    pix_z = cam_pts[:, 2]  # 保留体素到相机的深度信息
+    fov_mask = np.logical_and(pix_x >= 0,  # 得到视锥之内的体素模板
                 np.logical_and(pix_x < img_W,
                 np.logical_and(pix_y >= 0,
                 np.logical_and(pix_y < img_H,
