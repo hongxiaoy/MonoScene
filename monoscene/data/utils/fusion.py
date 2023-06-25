@@ -213,7 +213,7 @@ class TSDFVolume:
         vol_origin = vol_origin.astype(np.float32)
         vox_coords = vox_coords.astype(np.float32)
         #    print(np.min(vox_coords))
-        cam_pts = np.empty_like(vox_coords, dtype=np.float32)  # 用于存储相机坐标系点
+        cam_pts = np.empty_like(vox_coords, dtype=np.float32)  # 用于存储世界坐标系点
 
         for i in prange(vox_coords.shape[0]):  # 遍历每一个体素
             for j in range(3):  # 分别计算 x, y, z 的坐标
