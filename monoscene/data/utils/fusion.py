@@ -202,14 +202,21 @@ class TSDFVolume:
     @staticmethod
     @njit(parallel=True)
     def vox2world(vol_origin, vox_coords, vox_size, offsets=(0.5, 0.5, 0.5)):
-        """Convert voxel grid coordinates to world coordinates."""
+        """将体素格坐标转换到世界坐标.
+
+        Args:
+            vol_origin: 索引为原点的体素所在的世界坐标.
+            vox_coords: 
+            vox_size: 体素大小
+            offsets: 偏置
+        """
         vol_origin = vol_origin.astype(np.float32)
         vox_coords = vox_coords.astype(np.float32)
         #    print(np.min(vox_coords))
-        cam_pts = np.empty_like(vox_coords, dtype=np.float32)
+        cam_pts = np.empty_like(vox_coords, dtype=np.float32)  # 用于存储相机坐标系点
 
-        for i in prange(vox_coords.shape[0]):
-            for j in range(3):
+        for i in prange(vox_coords.shape[0]):  # 遍历每一个体素
+            for j in range(3):  # 分别计算 x, y, z 的坐标
                 cam_pts[i, j] = (
                     vol_origin[j]
                     + (vox_size * vox_coords[i, j])
@@ -220,12 +227,19 @@ class TSDFVolume:
     @staticmethod
     @njit(parallel=True)
     def cam2pix(cam_pts, intr):
-        """Convert camera coordinates to pixel coordinates."""
+        """将相机坐标系转换到像素坐标系.
+
+        没有直接使用矩阵相乘, 而采用了最朴素的计算方法以利用 njit 加速.
+
+        Args:
+            cam_pts: 相机坐标系下的点坐标.
+            intr: 相机内参
+        """
         intr = intr.astype(np.float32)
         fx, fy = intr[0, 0], intr[1, 1]
         cx, cy = intr[0, 2], intr[1, 2]
-        pix = np.empty((cam_pts.shape[0], 2), dtype=np.int64)
-        for i in prange(cam_pts.shape[0]):
+        pix = np.empty((cam_pts.shape[0], 2), dtype=np.int64)  # 存储像素坐标用
+        for i in prange(cam_pts.shape[0]):  # 遍历每个相机坐标系的点
             pix[i, 0] = int(np.round((cam_pts[i, 0] * fx / cam_pts[i, 2]) + cx))
             pix[i, 1] = int(np.round((cam_pts[i, 1] * fy / cam_pts[i, 2]) + cy))
         return pix
